@@ -1,0 +1,539 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Step Summit</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Lilita+One&display=swap">
+<style>
+/* Layout: alpine trail across the top (5 camps per round); work area left, prompt + keypad right; pine = done, sun = now */
+:root{
+  --bg:#e9f1ed; --card:#ffffff; --ink:#1b2a26; --muted:#566a64; --line:#cddbd4;
+  --pine:#2b6a4f; --pine-soft:#dcefe4; --sun:#c97c10; --sun-soft:#fdf0d8;
+  --err:#b3261e; --err-soft:#fbe6e3; --sky:#d4e6ee; --rock:#9fb3ab;
+  --display:"Lilita One","Arial Rounded MT Bold","Trebuchet MS",sans-serif;
+  --body:"Atkinson Hyperlegible",system-ui,-apple-system,"Segoe UI",sans-serif;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#101917; --card:#17231f; --ink:#e5eeea; --muted:#9db1aa; --line:#2a3a34;
+  --pine:#6fd0a0; --pine-soft:#1c3329; --sun:#f3b44f; --sun-soft:#3a2b14;
+  --err:#ff8d83; --err-soft:#3b1d1a; --sky:#162630; --rock:#4b5f58; color-scheme:dark }}
+:root[data-theme="dark"]{
+  --bg:#101917; --card:#17231f; --ink:#e5eeea; --muted:#9db1aa; --line:#2a3a34;
+  --pine:#6fd0a0; --pine-soft:#1c3329; --sun:#f3b44f; --sun-soft:#3a2b14;
+  --err:#ff8d83; --err-soft:#3b1d1a; --sky:#162630; --rock:#4b5f58; color-scheme:dark }
+
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:16px;line-height:1.45}
+.wrap{max-width:1000px;margin:0 auto;padding-inline:16px;padding-block:20px 40px;display:grid;gap:16px}
+header{display:flex;flex-wrap:wrap;gap:12px 20px;align-items:center;justify-content:space-between}
+h1{font-family:var(--display);font-weight:400;font-size:clamp(30px,6vw,42px);margin:0;letter-spacing:.01em;color:var(--pine);line-height:1}
+.controls{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.seg{display:inline-grid;grid-auto-flow:column;border:2px solid var(--pine);border-radius:12px;overflow:hidden}
+.seg button{font:inherit;font-weight:700;border:0;background:var(--card);color:var(--pine);padding:8px 14px;cursor:pointer;min-height:42px}
+.seg button[aria-pressed="true"]{background:var(--pine);color:var(--card)}
+select{font:inherit;color:var(--ink);background:var(--card);border:2px solid var(--line);border-radius:10px;padding:8px 10px;min-height:42px}
+.check{display:flex;gap:6px;align-items:center;font-size:15px}
+.check input{width:18px;height:18px;accent-color:var(--pine)}
+
+.trail{background:linear-gradient(var(--sky),var(--card));border:1px solid var(--line);border-radius:16px;padding:8px 12px;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:center}
+.trail svg{width:100%;height:auto;display:block;max-height:150px}
+.score{font-family:var(--display);font-size:28px;color:var(--sun);text-align:right;line-height:1;white-space:nowrap}
+.score small{display:block;font-family:var(--body);font-size:13px;color:var(--muted);font-weight:700;letter-spacing:.04em;text-transform:uppercase}
+
+.board{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:16px;align-items:start}
+.work{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:20px;min-width:0;display:grid;gap:14px;min-height:340px;align-content:start}
+.label{font-size:13px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:700;margin:0}
+.big{font-family:var(--display);font-weight:400;font-size:clamp(30px,6vw,44px);margin:0;line-height:1.1;font-variant-numeric:tabular-nums}
+
+/* long division */
+.ld-wrap{overflow-x:auto}
+.ld{--cw:1.15em;display:grid;grid-auto-rows:1.35em;font-size:clamp(30px,7vw,46px);font-variant-numeric:tabular-nums;width:max-content;padding:4px 8px 8px}
+.ld .c{display:grid;place-items:center;min-width:0;border-radius:6px;position:relative}
+.ld .dd{border-top:3px solid var(--ink)}
+.ld .dd.first{border-left:3px solid var(--ink);border-top-left-radius:10px}
+.ld .dv{color:var(--muted)}
+.ld .q{color:var(--pine);font-weight:700}
+.ld .ul{border-bottom:3px solid var(--ink);border-radius:0}
+.ld .sign{color:var(--muted);font-size:.8em}
+.ld .bd{color:var(--sun);font-weight:700}
+.ld .bd.new{animation:drop .4s ease-out}
+[hidden]{display:none!important}
+.ld .focus{background:var(--sun-soft)}
+.ld .ask{background:var(--sun);color:var(--card);font-weight:700;animation:pulse 1.4s ease-in-out infinite}
+.ld .pick{cursor:pointer;outline:2px dashed var(--sun);outline-offset:-3px}
+.ld .pick:hover{background:var(--sun-soft)}
+@keyframes drop{from{transform:translateY(-1.2em);opacity:0}}
+@keyframes pulse{50%{filter:brightness(1.12);transform:scale(1.05)}}
+
+.ld .c.dv{width:auto;padding-right:.18em;justify-items:end}
+.ld .cy{font-size:.5em;color:var(--sun);font-weight:700;align-self:end}
+.ld .cy.ask{font-size:.5em}
+.ld .res{color:var(--pine);font-weight:700}
+.ld .thin{height:.75em}
+
+.side{display:grid;gap:12px;min-width:0}
+.prompt{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px;display:grid;gap:12px}
+.qtext{font-size:21px;font-weight:700;margin:0;text-wrap:balance}
+.typed{font-family:var(--display);font-size:40px;min-height:56px;border:3px solid var(--sun);border-radius:12px;display:grid;place-items:center;font-variant-numeric:tabular-nums;color:var(--ink);background:var(--sun-soft)}
+.typed.empty{color:var(--muted)}
+.typed.shake{animation:shake .35s;border-color:var(--err);background:var(--err-soft)}
+@keyframes shake{25%{transform:translateX(-6px)}50%{transform:translateX(6px)}75%{transform:translateX(-3px)}}
+.pad{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.pad button{font-family:var(--display);font-size:26px;border:2px solid var(--line);background:var(--card);color:var(--ink);border-radius:12px;min-height:54px;cursor:pointer;box-shadow:0 3px 0 var(--line)}
+.pad button:active{transform:translateY(2px);box-shadow:0 1px 0 var(--line)}
+.pad .go{background:var(--pine);border-color:var(--pine);color:var(--card);box-shadow:0 3px 0 color-mix(in srgb,var(--pine) 60%,#000)}
+.msg{border-radius:12px;padding:10px 12px;font-size:16px;background:var(--bg);min-height:46px}
+.msg.good{background:var(--pine-soft)} .msg.bad{background:var(--err-soft)} .msg.tip{background:var(--sun-soft)}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.chips span{border:1px solid var(--line);background:var(--card);border-radius:8px;padding:1px 7px;font-variant-numeric:tabular-nums}
+.row{display:flex;flex-wrap:wrap;gap:8px}
+.btn{font-family:var(--display);font-size:18px;font-weight:400;border:2px solid var(--pine);background:var(--pine);color:var(--card);border-radius:12px;padding:8px 16px;cursor:pointer;min-height:44px}
+.btn.ghost{background:transparent;color:var(--pine)}
+button:focus-visible,select:focus-visible,input:focus-visible{outline:3px solid var(--sun);outline-offset:2px}
+
+.done{display:grid;gap:10px;justify-items:start}
+.stars{font-size:34px;color:var(--sun);letter-spacing:4px}
+.stars .off{color:var(--line)}
+
+@media (max-width:780px){ .board{grid-template-columns:minmax(0,1fr)} .work{min-height:0} }
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+body{margin:0}
+img{max-width:100%}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header>
+    <h1>Step Summit</h1>
+    <div class="controls">
+      <div class="seg" role="group" aria-label="Game">
+        <button id="mMul" aria-pressed="true">Multiply</button>
+        <button id="mDiv" aria-pressed="false">Divide</button>
+      </div>
+      <select id="level" aria-label="Level"></select>
+      <label class="check" id="remWrap" for="rem" hidden><input type="checkbox" id="rem"> Remainders</label>
+    </div>
+  </header>
+
+  <div class="trail">
+    <svg id="trail" viewBox="0 0 640 120" role="img" aria-label="Climb progress"></svg>
+    <div class="score"><span id="score">★ 0</span><small>this climb</small></div>
+  </div>
+
+  <div class="board">
+    <section class="work" id="work" aria-live="polite"></section>
+    <aside class="side">
+      <div class="prompt" id="prompt">
+        <p class="qtext" id="qtext"></p>
+        <div class="typed empty" id="typed" aria-live="polite">?</div>
+        <div class="pad" id="pad"></div>
+        <div class="msg" id="msg"></div>
+        <div class="row">
+          <button class="btn ghost" id="hintBtn">Hint</button>
+          <button class="btn ghost" id="skipBtn">New problem</button>
+        </div>
+      </div>
+    </aside>
+  </div>
+</div>
+
+<script>
+const $=id=>document.getElementById(id);
+const rnd=(a,b)=>a+Math.floor(Math.random()*(b-a+1));
+const ROUND=5;
+const PLACE=['ones','tens','hundreds','thousands','ten thousands','hundred thousands'];
+
+const LEVELS={
+  mul:[
+    {name:'2-digit × 1-digit', gen:()=>[nd(2),rnd(3,9)]},
+    {name:'3-digit × 1-digit', gen:()=>[nd(3),rnd(3,9)]},
+    {name:'4-digit × 1-digit', gen:()=>[nd(4),rnd(3,9)]},
+    {name:'2-digit × 2-digit', gen:()=>[nd(2),nd(2)]},
+    {name:'3-digit × 2-digit', gen:()=>[nd(3),nd(2)]},
+  ],
+  div:[
+    {name:'2-digit ÷ 1-digit', digits:2, dv:[2,6]},
+    {name:'3-digit ÷ 1-digit', digits:3, dv:[3,9]},
+    {name:'4-digit ÷ 1-digit', digits:4, dv:[3,9]},
+    {name:'3-digit ÷ 2-digit', digits:3, dv:[11,49]},
+    {name:'4-digit ÷ 2-digit', digits:4, dv:[11,89]},
+  ]
+};
+function nd(n){ let v; do{ v=rnd(10**(n-1),10**n-1); }while(v%10===0 || (n===2 && v<12)); return v; }
+
+function genDiv(L,withRem){
+  for(let t=0;t<2000;t++){
+    const q=rnd(L.dv[0],L.dv[1]); if(q>=10 && q%10===0) continue;
+    const lo=10**(L.digits-1), hi=10**L.digits-1;
+    let D;
+    if(withRem){ D=rnd(lo,hi); if(D%q===0) continue; }
+    else { const k=rnd(Math.ceil(lo/q),Math.floor(hi/q)); D=k*q; }
+    if(D<lo||D>hi||Math.floor(D/q)<10) continue;
+    return [D,q];
+  }
+  return [84,4];
+}
+
+/* ---------- multiplication: the written column method ---------- */
+function buildMul(a,b){
+  const ad=[...String(a)].reverse().map(Number), bd=[...String(b)].reverse().map(Number);
+  const la=ad.length, lb=bd.length, W=la+lb;
+  const steps=[], partial=[];
+  bd.forEach((y,r)=>{
+    const prow='p'+r, pd={};
+    if(r>0){
+      steps.push({kind:'zero',r,ans:0,target:[prow,0],writes:[[prow,0,'0']],focus:[['b',1]],
+        text:`Now multiply by the ${y} in the tens place. What goes in the ones place first?`, after:'Write 0 to hold the ones place.'});
+      pd[0]=0;
+    }
+    let carry=0;
+    ad.forEach((x,c)=>{
+      const col=c+r, prod=x*y, val=prod+carry, last=c===la-1, writes=[];
+      let next=0;
+      if(last){ [...String(val)].reverse().forEach((ch,m)=>{ writes.push([prow,col+m,ch]); pd[col+m]=+ch; }); }
+      else{
+        writes.push([prow,col,String(val%10)]); pd[col]=val%10; next=Math.floor(val/10);
+        if(next) writes.push(['mc'+r,col+1,String(next),'cy']);
+      }
+      const after = last? '' : next? `Write ${val%10}, carry ${next}.` : `Write ${val%10}.`;
+      const focus=[['a',c],['b',r]];
+      if(carry){
+        steps.push({kind:'mf',r,x,y,ans:prod,target:[prow,col],writes:[],focus,text:`${y} × ${x} = ?`});
+        steps.push({kind:'ac',r,prod,carry,ans:val,target:[prow,col],writes,after,focus:[['mc'+r,col]],
+          text:`Now add the carry: ${prod} + ${carry} = ?`});
+      } else steps.push({kind:'mf',r,x,y,ans:prod,target:[prow,col],writes,after,focus,text:`${y} × ${x} = ?`});
+      carry=next;
+    });
+    partial.push(pd);
+  });
+  if(lb>1){
+    const [P0,P1]=partial;
+    const maxc=Math.max(...Object.keys(P0).map(Number),...Object.keys(P1).map(Number));
+    let carry=0;
+    for(let c=0;c<=maxc;c++){
+      const xs=[P0[c],P1[c]].filter(v=>v!==undefined), sum=xs.reduce((s,v)=>s+v,0)+carry, last=c===maxc, writes=[];
+      let next=0;
+      if(last){ [...String(sum)].reverse().forEach((ch,m)=>writes.push(['s',c+m,ch,'res'])); }
+      else{ writes.push(['s',c,String(sum%10),'res']); next=Math.floor(sum/10); if(next) writes.push(['ac',c+1,String(next),'cy']); }
+      const terms=xs.map(String); if(carry) terms.push(String(carry));
+      const text = terms.length>1 ? `Add the ${PLACE[c]}: ${terms.join(' + ')} = ?` : `Add the ${PLACE[c]}: there's only ${terms[0]}. What do you write?`;
+      const after = last? '' : next? `Write ${sum%10}, carry ${next}.` : `Write ${sum}.`;
+      steps.push({kind:'add',c,ans:sum,carry,target:['s',c],writes,after,focus:[['p0',c],['p1',c],['ac',c]],text});
+      carry=next;
+    }
+  }
+  return {type:'mul',a,b,la,lb,W,ad,bd,steps,result:a*b};
+}
+
+/* ---------- long division ---------- */
+function buildDiv(D,q){
+  const d=String(D).split('').map(Number), n=d.length;
+  let s=0, cur=d[0]; while(cur<q && s<n-1){ s++; cur=cur*10+d[s]; }
+  const blocks=[], steps=[];
+  for(let i=s;i<n;i++){
+    const qd=Math.floor(cur/q), p=qd*q, r=cur-p, k=blocks.length;
+    blocks.push({i,cur,qd,p,r});
+    steps.push({kind:'qd',k,ans:qd,text:`How many ${q}s fit in ${cur}?`});
+    steps.push({kind:'p',k,ans:p,text:`Multiply: ${qd} × ${q} = ?`});
+    steps.push({kind:'r',k,ans:r,text:`Subtract: ${cur} − ${p} = ?`});
+    if(i<n-1){ steps.push({kind:'bring',k,col:i+1,text:`Bring down the next digit. Tap it in ${D}.`}); cur=r*10+d[i+1]; }
+  }
+  return {type:'div',D,q,d,n,s,blocks,steps,quot:Math.floor(D/q),rem:D%q};
+}
+
+/* ---------- state ---------- */
+let mode='mul', levelIdx=0, withRem=false;
+let round, P;
+let best={};
+try{ best=JSON.parse(localStorage.getItem('ss-best2')||'{}')||{}; }catch(e){}
+
+function newRound(){ round={idx:0, stars:[]}; newProblem(); }
+function newProblem(){
+  const L=LEVELS[mode][levelIdx];
+  let data;
+  if(mode==='mul'){ const [a,b]=L.gen(); data=buildMul(a,b); }
+  else { const [D,q]=genDiv(L,withRem); data=buildDiv(D,q); }
+  P={data, stepIdx:0, typed:'', miss:0, stepMiss:0, hints:0, finished:false};
+  let intro;
+  if(data.type==='div') intro = data.s>0 ? `${data.q} doesn't fit in ${data.D.toString().slice(0,data.s)}, so start with ${data.blocks[0].cur}.` : `Start with ${data.d[0]}.`;
+  else intro = `Start with the ones digit of ${data.b}. Work from right to left.`;
+  setMsg('tip',intro);
+  render();
+}
+function step(){ return P.data.steps[P.stepIdx]; }
+function setMsg(kind,html){ const m=$('msg'); m.className='msg '+kind; m.innerHTML=html; }
+
+/* ---------- input ---------- */
+function press(k){
+  if(P.finished) return;
+  const s=step(); if(!s || s.kind==='bring') return;
+  if(k==='del') P.typed=P.typed.slice(0,-1);
+  else if(k==='go') return submit();
+  else if(P.typed.length<6) P.typed=(P.typed==='0'?'':P.typed)+k;
+  render();
+}
+function submit(){
+  const s=step();
+  if(P.typed===''){ setMsg('bad','Type a number first.'); return; }
+  const v=+P.typed;
+  if(v===s.ans){
+    P.stepIdx++; P.typed=''; P.stepMiss=0;
+    if(P.stepIdx>=P.data.steps.length) return finish();
+    const nx=step();
+    setMsg('good',[praise(), s.after||'', nx.kind==='bring'?'Now bring down the next digit.':''].filter(Boolean).join(' '));
+    render(); return;
+  }
+  P.miss++; P.stepMiss++;
+  const t=$('typed'); t.classList.remove('shake'); void t.offsetWidth; t.classList.add('shake');
+  setMsg('bad', P.stepMiss>=2 ? `It's <strong>${s.ans}</strong>. Type ${s.ans} to keep climbing.` : whyWrong(s,v));
+  P.typed=''; render();
+}
+function whyWrong(s,v){
+  const d=P.data;
+  if(s.kind==='qd'){
+    const b=d.blocks[s.k], q=d.q;
+    if(v*q>b.cur) return `Too big. ${v} × ${q} = ${v*q}, and that's more than ${b.cur}.`;
+    return `${v} × ${q} = ${v*q}. That leaves ${b.cur-v*q}, and another ${q} still fits. Try a bigger number.`;
+  }
+  if(s.kind==='r' && v>d.blocks[s.k].cur) return `The answer can't be bigger than ${d.blocks[s.k].cur}. Try again.`;
+  if(s.kind==='zero') return 'Multiplying by tens always puts a 0 in the ones place.';
+  if(s.kind==='ac' && v===s.prod) return `Don't forget the ${s.carry} you carried.`;
+  if(s.kind==='add' && s.carry && v===s.ans-s.carry) return `Don't forget the ${s.carry} you carried.`;
+  return 'Not quite. Try again.';
+}
+const PRAISE=['Yes!','Nice!','Got it!','Great step!','Correct!'];
+const praise=()=>PRAISE[rnd(0,PRAISE.length-1)];
+
+function pickDigit(col){
+  const s=step(); if(!s || s.kind!=='bring') return;
+  if(col===s.col){
+    P.stepIdx++; P.stepMiss=0;
+    setMsg('good',`Brought down the ${P.data.d[col]}. ${step().text.replace(' = ?','?')}`);
+    render();
+  } else {
+    P.miss++;
+    setMsg('bad','Don\'t skip a digit. Bring down the one right after the digits you have already used.');
+  }
+}
+
+function hint(){
+  const s=step(); if(!s || P.finished) return;
+  P.hints++;
+  const d=P.data, q=d.q;
+  if(s.kind==='qd'){
+    const cur=d.blocks[s.k].cur;
+    const m=[...Array(9)].map((_,i)=>`<span>${i+1} × ${q} = ${(i+1)*q}</span>`).join('');
+    const est = q>=10 ? `Round ${q} to ${Math.round(q/10)*10} to make a guess, then check. ` : '';
+    setMsg('tip',`${est}Find the biggest one that is not more than ${cur}.<div class="chips">${m}</div>`);
+  } else if(s.kind==='p'){
+    const qd=d.blocks[s.k].qd;
+    setMsg('tip', q>=10 ? `Split ${q} into ${q-q%10} + ${q%10}. Do ${qd} × ${q-q%10} and ${qd} × ${q%10}, then add.` : `Count by ${q}s, ${qd} times.`);
+  } else if(s.kind==='r'){
+    const b=d.blocks[s.k]; setMsg('tip',`Count up from ${b.p} to ${b.cur}.`);
+  } else if(s.kind==='bring'){
+    setMsg('tip',`It's the digit right after the ones you have used. Look at the top number, ${d.D}.`);
+  } else if(s.kind==='mf'){
+    setMsg('tip', s.x===0||s.y===0 ? 'Anything times 0 is 0.' : `Times table: count by ${s.y}s, ${s.x} times.`);
+  } else if(s.kind==='ac'){
+    setMsg('tip',`Count up ${s.carry} from ${s.prod}.`);
+  } else if(s.kind==='zero'){
+    setMsg('tip',`The ${d.bd[1]} means ${d.bd[1]} tens, so this row is counted in tens. The ones place gets a 0.`);
+  } else if(s.kind==='add'){
+    setMsg('tip','Add the digits in the highlighted column, including any small carried number on top.');
+  }
+  render();
+}
+
+function finish(){
+  P.finished=true; P.typed='';
+  const cost=P.miss+P.hints, st= cost===0?3 : cost<=2?2 : 1;
+  round.stars.push(st);
+  const total=round.stars.reduce((a,b)=>a+b,0);
+  const key=`${mode}-${levelIdx}-${withRem?1:0}`;
+  if(round.stars.length===ROUND && !(best[key]>=total)){ best[key]=total; try{ localStorage.setItem('ss-best2',JSON.stringify(best)); }catch(e){} }
+  render();
+}
+
+/* ---------- rendering ---------- */
+function render(){
+  renderTrail();
+  const d=P.data, s=step();
+  $('qtext').textContent = P.finished? 'Problem done!' : s.text;
+  const typed=$('typed'), bring = s && s.kind==='bring';
+  typed.hidden = P.finished || bring; $('pad').hidden = P.finished || bring;
+  typed.textContent = P.typed || '?'; typed.classList.toggle('empty',!P.typed);
+  $('hintBtn').hidden=P.finished; $('skipBtn').hidden=P.finished;
+  const w=$('work'); w.innerHTML='';
+  const head=document.createElement('div');
+  head.innerHTML = d.type==='mul'
+    ? `<p class="label">Problem ${round.idx+1} of ${ROUND} · Column multiplication</p><p class="big">${d.a} × ${d.b}</p>`
+    : `<p class="label">Problem ${round.idx+1} of ${ROUND} · Long division</p><p class="big">${d.D} ÷ ${d.q}</p>`;
+  w.append(head);
+  w.append(d.type==='mul'? renderMul(d) : renderDiv(d));
+  if(P.finished) w.append(renderDone(d));
+}
+
+function gridFrom(cells, cols, colOf, onPick){
+  const g=document.createElement('div'); g.className='ld';
+  g.style.gridTemplateColumns=cols;
+  cells.forEach(c=>{
+    const el=document.createElement('div'); el.className='c '+c.cls; el.textContent=c.text;
+    el.style.gridRow=c.row; el.style.gridColumn=colOf(c.col);
+    if(onPick && c.cls.includes('pick')){ el.setAttribute('role','button'); el.tabIndex=0; el.onclick=()=>onPick(c.col);
+      el.onkeydown=e=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); onPick(c.col);} }; }
+    g.append(el);
+  });
+  const wrap=document.createElement('div'); wrap.className='ld-wrap'; wrap.append(g); return wrap;
+}
+function cellStore(){
+  const cells=new Map();
+  const put=(row,col,text,cls='')=>{
+    const key=row+':'+col, c=cells.get(key);
+    if(c){ if(text!=='') c.text=text; c.cls+=' '+cls; } else cells.set(key,{row,col,text,cls});
+  };
+  return {cells,put};
+}
+
+function renderMul(d){
+  const {cells,put}=cellStore(), s=step(), W=d.W;
+  const two=d.lb>1;
+  const ROW = two ? {mc:1,a:2,b:3,ac:4,p0:5,p1:6,s:7} : {mc:1,a:2,b:3,p0:4};
+  const rowOf=name=> name.startsWith('mc')? ROW.mc : ROW[name];
+  // problem
+  d.ad.forEach((x,c)=>put(ROW.a,c,String(x)));
+  d.bd.forEach((y,c)=>put(ROW.b,c,String(y)));
+  put(ROW.b,W,'×','sign');
+  for(let c=0;c<=W;c++) put(ROW.b,c,'','ul');
+  if(two){ put(ROW.p1,W,'+','sign'); for(let c=0;c<=W;c++) put(ROW.p1,c,'','ul'); put(ROW.ac,0,'','thin'); }
+  put(ROW.mc,0,'','thin');
+  // which multiplication row is active (only its carries are shown)
+  const activeR = !P.finished && s && s.r!==undefined ? s.r : null;
+  d.steps.forEach((st,j)=>{
+    if(j>=P.stepIdx) return;
+    st.writes.forEach(([row,col,ch,cls])=>{
+      if(row.startsWith('mc') && row!=='mc'+activeR) return;
+      put(rowOf(row),col,ch,cls||'');
+    });
+  });
+  if(!P.finished && s){
+    s.focus.forEach(([row,col])=>{ if(row.startsWith('mc') && row!=='mc'+activeR) return; put(rowOf(row),col,'','focus'); });
+    const [trow,tcol]=s.target, str=P.typed||'?';
+    [...str].reverse().forEach((ch,m)=>put(rowOf(trow),tcol+m,ch,'ask'));
+  }
+  return gridFrom(cells,`repeat(${W+1}, var(--cw))`,col=>1+W-col);
+}
+
+function renderDiv(d){
+  const {cells,put}=cellStore(), s=step();
+  const doneK=(kind,k)=>d.steps.some((x,j)=>j<P.stepIdx&&x.kind===kind&&x.k===k);
+  const isCur=(kind,k)=>!P.finished && s && s.kind===kind && s.k===k;
+  const placeNum=(row,end,str,cls)=>{ [...str].forEach((ch,m)=>put(row,end-str.length+1+m,ch,cls)); };
+
+  put(2,-1,String(d.q),'dv');
+  let used=d.s; d.steps.forEach((x,j)=>{ if(j<P.stepIdx&&x.kind==='bring') used=x.col; });
+  d.d.forEach((x,c)=>put(2,c,String(x),'dd'+(c===0?' first':'')+(s&&s.kind==='bring'&&c>used&&!P.finished?' pick':'')));
+
+  d.blocks.forEach((b,k)=>{
+    const prow=3+2*k, rrow=4+2*k, start=b.i-String(b.cur).length+1;
+    if(doneK('qd',k)) put(1,b.i,String(b.qd),'q');
+    else if(isCur('qd',k)) placeNum(1,b.i,P.typed||'?','ask');
+    if(doneK('p',k)||isCur('p',k)){
+      for(let c=start;c<=b.i;c++) put(prow,c,'','ul');
+      placeNum(prow,b.i, doneK('p',k)? String(b.p) : (P.typed||'?'), doneK('p',k)?'':'ask');
+      put(prow,start-1,'−','sign');
+    }
+    if(doneK('r',k)||isCur('r',k)) placeNum(rrow,b.i, doneK('r',k)? String(b.r) : (P.typed||'?'), doneK('r',k)?'':'ask');
+    if(doneK('bring',k)){
+      const prev=d.steps[P.stepIdx-1], justNow = prev && prev.kind==='bring' && prev.k===k && !P.typed;
+      put(rrow,b.i+1,String(d.d[b.i+1]),'bd'+(justNow?' new':''));
+    }
+    if(!P.finished && s && s.k===k && s.kind!=='bring'){
+      const frow = k===0? 2 : 4+2*(k-1);
+      for(let c=start;c<=b.i;c++) put(frow,c,'','focus');
+    }
+  });
+  return gridFrom(cells,`auto repeat(${d.n}, var(--cw))`,col=>col+2,pickDigit);
+}
+
+function renderDone(d){
+  const st=round.stars[round.stars.length-1], total=round.stars.reduce((a,b)=>a+b,0);
+  const el=document.createElement('div'); el.className='done';
+  const eq = d.type==='mul' ? `${d.a} × ${d.b} = ${d.result}` : `${d.D} ÷ ${d.q} = ${d.quot}${d.rem?` R ${d.rem}`:''}`;
+  const check = d.type==='div' ? `<p style="margin:0;color:var(--muted)">Check: ${d.quot} × ${d.q}${d.rem?` + ${d.rem}`:''} = ${d.D}</p>` : '';
+  const last = round.stars.length===ROUND;
+  const key=`${mode}-${levelIdx}-${withRem?1:0}`;
+  el.innerHTML=`<p class="big" style="color:var(--pine)">${eq}</p>${check}
+    <div class="stars" aria-label="${st} of 3 stars">${'★'.repeat(st)}<span class="off">${'★'.repeat(3-st)}</span></div>
+    <p style="margin:0">${st===3?'Perfect climb: no mistakes, no hints.': st===2?'Strong climb.':'You made it to camp. Keep going!'}</p>
+    ${last?`<p class="big" style="font-size:28px;color:var(--sun)">Summit! ★ ${total} of ${ROUND*3}</p><p style="margin:0;color:var(--muted)">Best on this level: ★ ${best[key]}</p>`:''}
+    <div class="row">${last? `<button class="btn" id="again">Climb again</button>${levelIdx<LEVELS[mode].length-1?'<button class="btn ghost" id="harder">Next level</button>':''}` : '<button class="btn" id="nextP">Next camp</button>'}</div>`;
+  setTimeout(()=>{
+    const n=$('nextP'); if(n){ n.onclick=()=>{ round.idx++; newProblem(); }; n.focus(); }
+    const a=$('again'); if(a){ a.onclick=newRound; a.focus(); }
+    const h=$('harder'); if(h) h.onclick=()=>{ levelIdx++; $('level').value=levelIdx; newRound(); };
+  });
+  setMsg('good', last? 'You reached the summit!' : `Camp ${round.idx+1} reached.`);
+  return el;
+}
+
+function renderTrail(){
+  const pts=[[40,100],[150,80],[260,92],[370,62],[480,70],[590,26]];
+  let h=`<polygon points="0,120 120,60 200,85 330,30 430,65 560,10 640,50 640,120" fill="var(--rock)" opacity=".35"/>`;
+  h+=`<polyline points="${pts.map(p=>p.join(',')).join(' ')}" fill="none" stroke="var(--muted)" stroke-width="3" stroke-dasharray="6 6" stroke-linecap="round"/>`;
+  pts.forEach((p,k)=>{
+    if(k===0){ h+=`<text x="${p[0]}" y="${p[1]+18}" text-anchor="middle" font-size="12" fill="var(--muted)" font-family="sans-serif">start</text>`; return; }
+    const i=k-1, st=round.stars[i], isNow = i===round.idx && st===undefined;
+    h+=`<circle cx="${p[0]}" cy="${p[1]}" r="14" fill="${st!==undefined?'var(--pine)':'var(--card)'}" stroke="${isNow?'var(--sun)':st!==undefined?'var(--pine)':'var(--muted)'}" stroke-width="${isNow?4:2}"/>`;
+    h+=`<text x="${p[0]}" y="${p[1]+5}" text-anchor="middle" font-size="14" font-weight="700" fill="${st!==undefined?'var(--card)':'var(--muted)'}" font-family="sans-serif">${k===ROUND?'▲':k}</text>`;
+    if(st!==undefined) h+=`<text x="${p[0]}" y="${p[1]-20}" text-anchor="middle" font-size="13" fill="var(--sun)" font-family="sans-serif">${'★'.repeat(st)}</text>`;
+  });
+  const cp=pts[Math.min(round.stars.length,ROUND)];
+  h+=`<g transform="translate(${cp[0]-6},${cp[1]-34})"><line x1="6" y1="0" x2="6" y2="18" stroke="var(--ink)" stroke-width="2"/><polygon points="7,0 20,5 7,10" fill="var(--sun)"/></g>`;
+  $('trail').innerHTML=h;
+  $('score').textContent='★ '+round.stars.reduce((a,b)=>a+b,0);
+}
+
+/* ---------- wiring ---------- */
+['1','2','3','4','5','6','7','8','9','del','0','go'].forEach(k=>{
+  const b=document.createElement('button');
+  b.textContent= k==='del'?'⌫' : k==='go'?'✓' : k;
+  b.setAttribute('aria-label', k==='del'?'Delete' : k==='go'?'Check' : k);
+  if(k==='go') b.className='go';
+  b.onmousedown=e=>e.preventDefault();
+  b.onclick=()=>press(k); $('pad').append(b);
+});
+document.addEventListener('keydown',e=>{
+  if(e.target.tagName==='SELECT'||e.target.tagName==='INPUT') return;
+  if(/^\d$/.test(e.key)) press(e.key);
+  else if(e.key==='Backspace') press('del');
+  else if(e.key==='Enter'){
+    if(P.finished || e.target.closest('.done') || e.target.classList.contains('pick')) return;
+    e.preventDefault(); press('go');
+  }
+});
+function fillLevels(){
+  const sel=$('level'); sel.innerHTML='';
+  LEVELS[mode].forEach((L,i)=>{ const o=document.createElement('option'); o.value=i; o.textContent=L.name; sel.append(o); });
+  sel.value=levelIdx;
+}
+function setMode(m){
+  mode=m; levelIdx=0;
+  $('mMul').setAttribute('aria-pressed',m==='mul'); $('mDiv').setAttribute('aria-pressed',m==='div');
+  $('remWrap').hidden = m!=='div';
+  fillLevels(); newRound();
+}
+$('mMul').onclick=()=>setMode('mul'); $('mDiv').onclick=()=>setMode('div');
+$('level').onchange=e=>{ levelIdx=+e.target.value; e.target.blur(); newRound(); };
+$('rem').onchange=e=>{ withRem=e.target.checked; e.target.blur(); newRound(); };
+$('typed').addEventListener('animationend',e=>e.target.classList.remove('shake'));
+$('hintBtn').onclick=hint;
+$('skipBtn').onclick=newProblem;
+
+fillLevels(); newRound();
+</script>
+</body>
+</html>
